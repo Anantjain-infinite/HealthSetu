@@ -5,6 +5,9 @@
  * with a descriptive error — prevents silent misconfiguration in production.
  */
 
+import dotenv from 'dotenv';
+dotenv.config();   // <-- THIS loads your .env file into process.env
+
 import { z } from 'zod';
 
 const envSchema = z.object({
