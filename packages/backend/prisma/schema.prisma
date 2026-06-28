@@ -1,0 +1,180 @@
+// This is your Prisma schema file for the HealthSetu Rural Telemedicine Platform.
+// Documentation: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum ConsultationStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SmsStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ─────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  role          Role
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  patient       Patient?
+  doctor        Doctor?
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  revoked   Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Patient {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  fullName         String   @map("full_name")
+  dateOfBirth      DateTime @map("date_of_birth")
+  emergencyContact String   @map("emergency_contact")
+  address          String
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consultations Consultation[] @relation("PatientConsultations")
+  prescriptions Prescription[]
+  emergencyLogs EmergencyLog[]
+
+  @@index([userId])
+  @@map("patients")
+}
+
+model Doctor {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  fullName       String   @map("full_name")
+  specialisation String
+  licenceNo      String   @unique @map("licence_no")
+  isAvailable    Boolean  @default(true) @map("is_available")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consultations Consultation[] @relation("DoctorConsultations")
+  prescriptions Prescription[]
+
+  @@index([userId])
+  @@index([specialisation])
+  @@index([isAvailable])
+  @@map("doctors")
+}
+
+model Consultation {
+  id          String             @id @default(uuid())
+  patientId   String             @map("patient_id")
+  doctorId    String             @map("doctor_id")
+  status      ConsultationStatus @default(PENDING)
+  symptoms    String
+  notes       String?
+  scheduledAt DateTime?          @map("scheduled_at")
+  startedAt   DateTime?          @map("started_at")
+  endedAt     DateTime?          @map("ended_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  patient       Patient        @relation("PatientConsultations", fields: [patientId], references: [id])
+  doctor        Doctor         @relation("DoctorConsultations", fields: [doctorId], references: [id])
+  prescriptions Prescription[]
+  transcript    Transcript?
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([patientId, status])
+  @@index([doctorId, status])
+  @@map("consultations")
+}
+
+model Prescription {
+  id             String   @id @default(uuid())
+  consultationId String   @map("consultation_id")
+  patientId      String   @map("patient_id")
+  doctorId       String   @map("doctor_id")
+  // S3 object key — NOT the full URL (pre-signed URLs are generated on demand)
+  fileKey        String   @map("file_key")
+  issuedAt       DateTime @default(now()) @map("issued_at")
+
+  consultation Consultation @relation(fields: [consultationId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+  doctor       Doctor       @relation(fields: [doctorId], references: [id])
+
+  @@index([patientId, issuedAt(sort: Desc)])
+  @@index([consultationId])
+  @@map("prescriptions")
+}
+
+model Transcript {
+  id             String   @id @default(uuid())
+  consultationId String   @unique @map("consultation_id")
+  // Stores TipTap JSON editor content
+  contentJson    Json     @map("content_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  consultation Consultation @relation(fields: [consultationId], references: [id])
+
+  @@index([consultationId])
+  @@map("transcripts")
+}
+
+model EmergencyLog {
+  id          String    @id @default(uuid())
+  patientId   String    @map("patient_id")
+  triggeredAt DateTime  @default(now()) @map("triggered_at")
+  smsStatus   SmsStatus @default(PENDING) @map("sms_status")
+  // GPS coordinates stored as Decimal for precision; nullable (user may deny location)
+  locationLat Decimal?  @map("location_lat")
+  locationLng Decimal?  @map("location_lng")
+
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([patientId, triggeredAt(sort: Desc)])
+  @@map("emergency_logs")
+}
