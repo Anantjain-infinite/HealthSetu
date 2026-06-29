@@ -12,9 +12,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { useRegister } from '../hooks/useAuth';
+import { useEffect } from 'react';
+import { useAuthStore } from '../store/authStore';
 
 // ── Zod schema ─────────────────────────────────────────────────────────────
 
@@ -95,6 +97,21 @@ const inputClass = (hasError: boolean) => `
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function RegisterForm() {
+
+  const user       = useAuthStore((s) => s.user);
+const isHydrated = useAuthStore((s) => s.isHydrated);
+const navigate   = useNavigate();
+
+useEffect(() => {
+  if (isHydrated && user) {
+    if (user.role === 'PATIENT') {
+      navigate('/patient/dashboard', { replace: true });
+    } else if (user.role === 'DOCTOR') {
+      navigate('/doctor/dashboard', { replace: true });
+    }
+  }
+}, [isHydrated, user, navigate]);
+
   const registerMutation = useRegister();
 
   const {

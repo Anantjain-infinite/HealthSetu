@@ -12,10 +12,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLogin } from '../hooks/useAuth';
+import { useAuthStore } from '../store/authStore';
 
 // ── Zod schema (client-side, mirrors backend) ──────────────────────────────
 
@@ -29,6 +30,20 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function LoginForm() {
+
+  const user       = useAuthStore((s) => s.user);
+const isHydrated = useAuthStore((s) => s.isHydrated);
+const navigate   = useNavigate();
+
+useEffect(() => {
+  if (isHydrated && user) {
+    if (user.role === 'PATIENT') {
+      navigate('/patient/dashboard', { replace: true });
+    } else if (user.role === 'DOCTOR') {
+      navigate('/doctor/dashboard', { replace: true });
+    }
+  }
+}, [isHydrated, user, navigate]);
   const [showPassword, setShowPassword] = useState(false);
   const loginMutation = useLogin();
 

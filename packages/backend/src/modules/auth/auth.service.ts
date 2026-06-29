@@ -297,8 +297,10 @@ export async function refresh(
   }
 
   // Rotate: revoke old, issue new
-  const newRefreshToken = signRefreshToken(payload);
-
+const newRefreshToken = signRefreshToken({
+  userId: payload.userId,
+  role:   payload.role,
+});
   await prisma.$transaction([
     // Mark old token as revoked
     prisma.refreshToken.update({
@@ -315,8 +317,10 @@ export async function refresh(
     }),
   ]);
 
-  const newAccessToken = signAccessToken(payload);
-
+const newAccessToken = signAccessToken({
+  userId: payload.userId,
+  role:   payload.role,
+});
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }
 
