@@ -63,15 +63,17 @@ export function SymptomForm({ onClose }: SymptomFormProps) {
   }
 
   const onSubmit = (values: SymptomFormValues) => {
-    createMutation.mutate(
-      {
-        doctorId:    values.doctorId,
-        symptoms:    values.symptoms,
-        scheduledAt: values.scheduledAt || undefined,
-      },
-      { onSuccess: onClose }
-    );
-  };
+  createMutation.mutate(
+    {
+      doctorId:    values.doctorId,
+      symptoms:    values.symptoms,
+      scheduledAt: values.scheduledAt
+        ? new Date(values.scheduledAt).toISOString()
+        : undefined,
+    },
+    { onSuccess: onClose }
+  );
+};
 
   return (
     /* Backdrop */

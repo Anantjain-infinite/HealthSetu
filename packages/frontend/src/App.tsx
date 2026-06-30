@@ -29,6 +29,13 @@ const PatientDashboard = lazy(() =>
     default: m.PatientDashboard,
   }))
 );
+
+const HealthRecordList = lazy(() =>
+  import('./features/patient/components/HealthRecordList').then((m) => ({
+    default: m.HealthRecordList,
+  }))
+);
+
 const DoctorDashboard = lazy(() =>
   import('./features/doctor/components/DoctorDashboard').then((m) => ({
     default: m.DoctorDashboard,
@@ -140,6 +147,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/patient/dashboard" element={<PatientDashboard />} />
               <Route path="/patient/emergency" element={<EmergencyLogPage />} />
+              <Route path="/patient/records" element={<HealthRecordList />} />
               {/* Consultations and records added in Step 3 */}
             </Route>
           </Route>
