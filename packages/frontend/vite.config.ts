@@ -35,46 +35,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Glob patterns of files to precache
+        // Glob patterns of files to precache — this list IS used by
+        // injectManifest to build self.__WB_MANIFEST in service-worker.ts.
+        // NOTE: runtimeCaching here would be IGNORED under the
+        // 'injectManifest' strategy — all runtime caching logic
+        // (cache-first prescriptions/history, network-first everything
+        // else) is written by hand in src/service-worker.ts instead.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Routes that use cache-first strategy (offline-capable)
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/.*\/api\/v1\/consultations\/history/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'consultation-history',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-            },
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/v1\/prescriptions/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'prescriptions-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-              },
-            },
-          },
-          {
-            // Network-first for all other API calls
-            urlPattern: /^https?:\/\/.*\/api\/v1\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 10,
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 5, // 5 minutes
-              },
-            },
-          },
-        ],
       },
     }),
   ],
@@ -85,6 +52,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true, // Expose dev server on local network (e.g. http://192.168.x.x:5173)
     // Proxy API calls to the backend during local development
     proxy: {
       '/api': {
