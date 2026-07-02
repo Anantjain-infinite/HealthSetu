@@ -19,24 +19,22 @@ import { ErrorBoundary } from './shared/components/ErrorBoundary';
 import { Layout } from './shared/components/Layout';
 
 // ── Auth pages (small — not lazy loaded) ──────────────────────────────────
-import { LoginForm } from './features/auth/components/LoginForm';
+import { LoginForm }    from './features/auth/components/LoginForm';
 import { RegisterForm } from './features/auth/components/RegisterForm';
 
 // ── Lazy-loaded feature pages ──────────────────────────────────────────────
 // Each import() creates a separate JS chunk — critical for slow 2G connections
-const PatientDashboard = lazy(() =>
+const PatientDashboard  = lazy(() =>
   import('./features/patient/components/PatientDashboard').then((m) => ({
     default: m.PatientDashboard,
   }))
 );
-
-const HealthRecordList = lazy(() =>
-  import('./features/patient/components/HealthRecordList').then((m) => ({
-    default: m.HealthRecordList,
+const AppointmentBooking = lazy(() =>
+  import('./features/patient/components/AppointmentBooking').then((m) => ({
+    default: m.AppointmentBooking,
   }))
 );
-
-const DoctorDashboard = lazy(() =>
+const DoctorDashboard   = lazy(() =>
   import('./features/doctor/components/DoctorDashboard').then((m) => ({
     default: m.DoctorDashboard,
   }))
@@ -46,12 +44,12 @@ const ConsultationQueue = lazy(() =>
     default: m.ConsultationQueue,
   }))
 );
-const VideoRoom = lazy(() =>
+const VideoRoom         = lazy(() =>
   import('./features/consultation/components/VideoRoom').then((m) => ({
     default: m.VideoRoom,
   }))
 );
-const EmergencyLogPage = lazy(() =>
+const EmergencyLogPage  = lazy(() =>
   import('./features/emergency/components/EmergencyLog').then((m) => ({
     default: m.EmergencyLog,
   }))
@@ -87,67 +85,31 @@ function UnauthorizedPage() {
   );
 }
 
-/**
- * Wraps public pages (login, register).
- * If the user is already authenticated, redirects them to their dashboard.
- * Prevents logged-in users from accessing /login or /register via URL.
- */
-function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
-  const user       = useAuthStore((s) => s.user);
-  const isHydrated = useAuthStore((s) => s.isHydrated);
-
-  // Still checking session — show nothing yet to prevent flash
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <LoadingSpinner size="lg" label="Loading..." />
-      </div>
-    );
-  }
-
-  // Already logged in — redirect to correct dashboard
-  if (user) {
-    if (user.role === 'PATIENT') {
-      return <Navigate to="/patient/dashboard" replace />;
-    }
-    if (user.role === 'DOCTOR') {
-      return <Navigate to="/doctor/dashboard" replace />;
-    }
-  }
-
-  // Not logged in — show the page normally
-  return <>{children}</>;
-}
-
 // ── App component ──────────────────────────────────────────────────────────
 
 export default function App() {
+  const hydrate = useAuthStore((s) => s.hydrate);
+
+  // Restore session on every page load / reload
   useEffect(() => {
-    useAuthStore.getState().hydrate();
-  }, []);
+    hydrate();
+  }, [hydrate]);
 
   return (
     <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* ── Public routes ──────────────────────────────────────── */}
-          {/* ── Public routes — redirect to dashboard if already logged in ── */}
-          <Route
-            path="/login"
-            element={<PublicOnlyRoute><LoginForm /></PublicOnlyRoute>}
-          />
-          <Route
-            path="/register"
-            element={<PublicOnlyRoute><RegisterForm /></PublicOnlyRoute>}
-          />
+          <Route path="/login"        element={<LoginForm />} />
+          <Route path="/register"     element={<RegisterForm />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* ── Patient routes ─────────────────────────────────────── */}
           <Route element={<ProtectedRoute allowedRoles={['PATIENT']} />}>
             <Route element={<Layout />}>
-              <Route path="/patient/dashboard" element={<PatientDashboard />} />
-              <Route path="/patient/emergency" element={<EmergencyLogPage />} />
-              <Route path="/patient/records" element={<HealthRecordList />} />
+              <Route path="/patient/dashboard"         element={<PatientDashboard />} />
+              <Route path="/patient/consultations/new" element={<AppointmentBooking />} />
+              <Route path="/patient/emergency"         element={<EmergencyLogPage />} />
               {/* Consultations and records added in Step 3 */}
             </Route>
           </Route>
@@ -156,7 +118,7 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['DOCTOR']} />}>
             <Route element={<Layout />}>
               <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-              <Route path="/doctor/queue" element={<ConsultationQueue />} />
+              <Route path="/doctor/queue"     element={<ConsultationQueue />} />
             </Route>
           </Route>
 

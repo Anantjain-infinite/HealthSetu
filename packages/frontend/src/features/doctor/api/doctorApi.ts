@@ -11,7 +11,7 @@ export async function getDoctorQueue(
   limit = 20
 ): Promise<PaginatedResponse<ConsultationSummary>> {
   const { data } = await api.get('/consultations', {
-    params: { status: 'PENDING', cursor, limit },
+    params: { status: 'ACCEPTED', cursor, limit },
   });
   return data;
 }

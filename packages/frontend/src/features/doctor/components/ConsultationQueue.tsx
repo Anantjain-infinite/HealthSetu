@@ -5,11 +5,12 @@
  * Accept button triggers mutation, expands notes panel on accepted item.
  */
 
-import { useRef, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useRef, useState } from 'react';import { useVirtualizer } from '@tanstack/react-virtual';
 import { Clock, User, CheckCircle, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { useDoctorQueue, useAcceptConsultation } from '../hooks/useDoctorQueue';
 import { ConsultationNotes } from './ConsultationNotes';
+import { PatientHistory } from './PatientHistory';
+import { PrescriptionUpload } from './PrescriptionUpload';
 import { LoadingSpinner } from '../../../shared/components/LoadingSpinner';
 import { ErrorBoundary } from '../../../shared/components/ErrorBoundary';
 import type { ConsultationSummary } from '../../../shared/types';
@@ -17,11 +18,11 @@ import type { ConsultationSummary } from '../../../shared/types';
 // ── Status badge ───────────────────────────────────────────────────────────
 
 const statusStyles: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-800',
-  ACCEPTED: 'bg-blue-100 text-blue-800',
+  PENDING:     'bg-yellow-100 text-yellow-800',
+  ACCEPTED:    'bg-blue-100 text-blue-800',
   IN_PROGRESS: 'bg-purple-100 text-purple-800',
-  COMPLETED: 'bg-accent-100 text-accent-800',
-  CANCELLED: 'bg-gray-100 text-gray-500',
+  COMPLETED:   'bg-accent-100 text-accent-800',
+  CANCELLED:   'bg-gray-100 text-gray-500',
 };
 
 // ── Queue row ──────────────────────────────────────────────────────────────
@@ -31,11 +32,12 @@ function QueueRow({
   isExpanded,
   onToggle,
 }: {
-  item: ConsultationSummary;
+  item:       ConsultationSummary;
   isExpanded: boolean;
-  onToggle: () => void;
+  onToggle:   () => void;
 }) {
   const acceptMutation = useAcceptConsultation();
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <div className="bg-white border-b border-gray-100">
@@ -73,14 +75,10 @@ function QueueRow({
               onClick={() => acceptMutation.mutate(item.id)}
               disabled={acceptMutation.isPending}
               aria-busy={acceptMutation.isPending}
-              className="
-                flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold
-                bg-accent-600 hover:bg-accent-700 disabled:bg-accent-300 text-white
-                focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors
-              "
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-accent-600 hover:bg-accent-700 disabled:bg-accent-300 text-white focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors"
             >
               {acceptMutation.isPending
-                ? <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                ? <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                 : <CheckCircle size={12} />
               }
               Accept
@@ -101,15 +99,41 @@ function QueueRow({
         </div>
       </div>
 
-      {/* Expandable notes panel */}
+      {/* Expandable panel */}
       {isExpanded && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 space-y-3">
+          {/* Patient history toggle */}
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="text-xs text-primary-600 font-medium hover:text-primary-700 focus:outline-none focus:underline"
+          >
+            {showHistory ? 'Hide patient history' : 'View patient history'}
+          </button>
+
+          {showHistory && (
+            <ErrorBoundary>
+              <PatientHistory
+                patientId={item.patient.id}
+                onClose={() => setShowHistory(false)}
+              />
+            </ErrorBoundary>
+          )}
+
+          {/* Notes editor */}
           <ErrorBoundary>
             <ConsultationNotes
               consultationId={item.id}
               onCompleted={onToggle}
             />
           </ErrorBoundary>
+
+          {/* Prescription upload — only after consultation is completed */}
+          {item.status === 'COMPLETED' && (
+            <ErrorBoundary>
+              <PrescriptionUpload consultationId={item.id} />
+            </ErrorBoundary>
+          )}
         </div>
       )}
     </div>
@@ -119,19 +143,17 @@ function QueueRow({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function ConsultationQueue() {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const parentRef  = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const { data, isLoading, isError, isFetching } = useDoctorQueue();
 
   const rows: ConsultationSummary[] = data?.data ?? [];
 
-  // FIXED — measures actual DOM height of each row
   const virtualizer = useVirtualizer({
-    count: rows.length,
+    count:            rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 100,
-    overscan: 5,
-    measureElement: (el) => el.getBoundingClientRect().height,
+    estimateSize:     () => 100,
+    overscan:         5,
   });
 
   return (
@@ -144,7 +166,7 @@ export function ConsultationQueue() {
         </div>
         {isFetching && !isLoading && (
           <div className="flex items-center gap-1.5 text-xs text-gray-400">
-            <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
             Updating…
           </div>
         )}
@@ -190,13 +212,11 @@ export function ConsultationQueue() {
                 return (
                   <div
                     key={virtualItem.key}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
                     style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
+                      position:  'absolute',
+                      top:       0,
+                      left:      0,
+                      width:     '100%',
                       transform: `translateY(${virtualItem.start}px)`,
                     }}
                   >

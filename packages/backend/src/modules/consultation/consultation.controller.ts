@@ -68,3 +68,14 @@ export const addNotes = asyncHandler(async (req: Request, res: Response) => {
   );
   res.json(consultation);
 });
+
+/** GET /api/v1/consultations/patient/:patientId — doctor views patient history */
+export const getPatientHistoryForDoctor = asyncHandler(async (req: Request, res: Response) => {
+  const { patientId } = req.params;
+  const result = await consultationService.getPatientHistoryForDoctor(
+    req.user!.userId,
+    patientId,
+    req.query
+  );
+  res.json(result);
+});

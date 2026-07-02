@@ -22,7 +22,7 @@ export const uploadMiddleware = multer({
       cb(new AppError('Only PDF files are allowed', 400, 'INVALID_FILE_TYPE'));
     }
   },
-}).single('prescription');
+}).single('file');
 
 /** POST /api/v1/prescriptions/:consultationId — upload (DOCTOR) */
 export const upload = asyncHandler(async (req: Request, res: Response) => {

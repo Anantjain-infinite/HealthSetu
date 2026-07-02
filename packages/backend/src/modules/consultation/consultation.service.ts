@@ -316,3 +316,59 @@ export async function getPatientHistory(
 
   return buildOffsetResult(rows, total, params);
 }
+
+// ── Doctor's view of a specific patient's history ─────────────────────────
+// Used by PatientHistory.tsx — shows only consultations between THIS doctor
+// and THIS patient (doctors must not see a patient's history with other
+// doctors — that would be a privacy violation).
+
+export async function getPatientHistoryForDoctor(
+  doctorUserId: string,
+  patientId: string,
+  query: { page?: unknown; limit?: unknown }
+) {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId: doctorUserId },
+    select: { id: true },
+  });
+  if (!doctor) throw new AppError('Doctor profile not found', 404, 'DOCTOR_NOT_FOUND');
+
+  // Confirm the patient exists (404 if not, rather than silently returning empty)
+  const patientExists = await prisma.patient.findUnique({
+    where: { id: patientId },
+    select: { id: true, fullName: true },
+  });
+  if (!patientExists) throw new AppError('Patient not found', 404, 'PATIENT_NOT_FOUND');
+
+  const params = parseOffsetParams(query);
+  const skip   = getSkip(params);
+
+  const [rows, total] = await Promise.all([
+    prisma.consultation.findMany({
+      where:   { doctorId: doctor.id, patientId },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: params.limit,
+      select: {
+        id:          true,
+        status:      true,
+        symptoms:    true,
+        notes:       true,
+        scheduledAt: true,
+        startedAt:   true,
+        endedAt:     true,
+        createdAt:   true,
+        prescriptions: {
+          select: { id: true, fileKey: true, issuedAt: true },
+          orderBy: { issuedAt: 'desc' },
+        },
+      },
+    }),
+    prisma.consultation.count({ where: { doctorId: doctor.id, patientId } }),
+  ]);
+
+  return {
+    patient: { id: patientExists.id, fullName: patientExists.fullName },
+    ...buildOffsetResult(rows, total, params),
+  };
+}
