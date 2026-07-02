@@ -58,6 +58,16 @@ export const accept = asyncHandler(async (req: Request, res: Response) => {
   res.json(consultation);
 });
 
+/** PATCH /api/v1/consultations/:id/start — start / mark IN_PROGRESS (DOCTOR) */
+export const start = asyncHandler(async (req: Request, res: Response) => {
+  const consultation = await consultationService.startConsultation(
+    req.user!.userId,
+    req.params.id,
+    getIo(req)
+  );
+  res.json(consultation);
+});
+
 /** PATCH /api/v1/consultations/:id/notes — add notes (DOCTOR) */
 export const addNotes = asyncHandler(async (req: Request, res: Response) => {
   const consultation = await consultationService.addNotes(

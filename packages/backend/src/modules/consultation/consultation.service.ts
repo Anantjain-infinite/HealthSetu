@@ -229,6 +229,54 @@ export async function getConsultationDetails(userId: string, role: string, consu
   return consultation;
 }
 
+// ── Start (doctor) ─────────────────────────────────────────────────────────
+// ACCEPTED → IN_PROGRESS when the video call begins.
+
+export async function startConsultation(
+  doctorUserId: string,
+  consultationId: string,
+  io: SocketIOServer
+) {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId: doctorUserId },
+    select: { id: true },
+  });
+  if (!doctor) throw new AppError('Doctor profile not found', 404, 'DOCTOR_NOT_FOUND');
+
+  const consultation = await prisma.consultation.findUnique({
+    where: { id: consultationId },
+    select: {
+      id:       true,
+      doctorId: true,
+      status:   true,
+      patient:  { select: { userId: true } },
+    },
+  });
+
+  if (!consultation) throw new AppError('Consultation not found', 404, 'NOT_FOUND');
+  if (consultation.doctorId !== doctor.id) throw new AppError('Forbidden', 403, 'FORBIDDEN');
+  if (consultation.status !== 'ACCEPTED') {
+    throw new AppError(
+      `Cannot start a consultation with status ${consultation.status}`,
+      409,
+      'INVALID_STATUS'
+    );
+  }
+
+  const updated = await prisma.consultation.update({
+    where: { id: consultationId },
+    data:  { status: 'IN_PROGRESS', startedAt: new Date() },
+    select: listSelect,
+  });
+
+  // Notify patient that doctor has started the call
+  io.to(`user:${consultation.patient.userId}`).emit('consultation:started', {
+    consultationId,
+  });
+
+  return updated;
+}
+
 // ── Add notes + complete (doctor) ─────────────────────────────────────────
 
 export async function addNotes(
@@ -256,24 +304,29 @@ export async function addNotes(
   if (!consultation) throw new AppError('Consultation not found', 404, 'NOT_FOUND');
   if (consultation.doctorId !== doctor.id) throw new AppError('Forbidden', 403, 'FORBIDDEN');
 
-  const newStatus =
-    consultation.status === 'IN_PROGRESS' ? 'COMPLETED' : consultation.status;
+  // Allow completing from either ACCEPTED or IN_PROGRESS
+  // (doctor may skip "Start" and go straight to notes in low-connectivity situations)
+  if (!['ACCEPTED', 'IN_PROGRESS'].includes(consultation.status)) {
+    throw new AppError(
+      `Cannot add notes to a consultation with status ${consultation.status}`,
+      409,
+      'INVALID_STATUS'
+    );
+  }
 
   const updated = await prisma.consultation.update({
     where: { id: consultationId },
     data: {
       notes:   input.notes,
-      status:  newStatus,
-      endedAt: newStatus === 'COMPLETED' ? new Date() : undefined,
+      status:  'COMPLETED',
+      endedAt: new Date(),
     },
     select: listSelect,
   });
 
-  if (newStatus === 'COMPLETED') {
-    io.to(`user:${consultation.patient.userId}`).emit('consultation:completed', {
-      consultationId,
-    });
-  }
+  io.to(`user:${consultation.patient.userId}`).emit('consultation:completed', {
+    consultationId,
+  });
 
   return updated;
 }

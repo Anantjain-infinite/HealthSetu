@@ -52,7 +52,7 @@ export async function getUpcomingConsultations(patientId: string) {
   return prisma.consultation.findMany({
     where: {
       patientId,
-      status: { in: ['PENDING', 'ACCEPTED'] },
+      status: { in: ['PENDING', 'ACCEPTED' , 'IN_PROGRESS'] },
     },
     orderBy: { scheduledAt: 'asc' },
     take: 5,

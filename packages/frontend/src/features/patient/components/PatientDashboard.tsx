@@ -6,15 +6,15 @@
  */
 
 import { useState } from 'react';
-import { Plus, Clock, CheckCircle, Activity, Calendar } from 'lucide-react';
+import { Plus, Clock, CheckCircle, Activity, Calendar, Video } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../features/auth/store/authStore';
 import { SOSButton } from './SOSButton';
 import { SymptomForm } from './SymptomForm';
 import { HealthRecordList } from './HealthRecordList';
 import { ErrorBoundary } from '../../../shared/components/ErrorBoundary';
 import { LoadingSpinner } from '../../../shared/components/LoadingSpinner';
-import { usePatientStats } from '../hooks/useHealthRecords';
-import { useUpcomingConsultations } from '../hooks/usePatientConsultations';
+import { usePatientStats, useUpcomingConsultations } from '../hooks/usePatientConsultations';
 import type { ConsultationSummary } from '../../../shared/types';
 
 // ── Stat card ──────────────────────────────────────────────────────────────
@@ -43,6 +43,9 @@ function StatCard({
 // ── Upcoming appointment card ──────────────────────────────────────────────
 
 function UpcomingCard({ consultation }: { consultation: ConsultationSummary }) {
+  const navigate = useNavigate();
+  const canJoin = consultation.status === 'ACCEPTED' || consultation.status === 'IN_PROGRESS';
+
   return (
     <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-xl border border-primary-100">
       <div className="w-9 h-9 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -59,12 +62,20 @@ function UpcomingCard({ consultation }: { consultation: ConsultationSummary }) {
           </p>
         )}
       </div>
-      <span className={`
-        badge text-xs flex-shrink-0
-        ${consultation.status === 'ACCEPTED' ? 'bg-accent-100 text-accent-800' : 'bg-yellow-100 text-yellow-800'}
-      `}>
-        {consultation.status}
-      </span>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className={`badge text-xs ${consultation.status === 'ACCEPTED' ? 'bg-accent-100 text-accent-800' : 'bg-yellow-100 text-yellow-800'}`}>
+          {consultation.status}
+        </span>
+        {canJoin && (
+          <button
+            onClick={() => navigate(`/consultation/${consultation.id}`)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors"
+          >
+            <Video size={11} />
+            Join
+          </button>
+        )}
+      </div>
     </div>
   );
 }

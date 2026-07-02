@@ -36,6 +36,12 @@ consultationRouter.patch(
 );
 
 consultationRouter.patch(
+  '/:id/start',
+  requireRole('DOCTOR'),
+  consultationController.start
+);
+
+consultationRouter.patch(
   '/:id/notes',
   requireRole('DOCTOR'),
   validateRequest(addNotesSchema),

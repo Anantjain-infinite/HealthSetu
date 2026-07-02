@@ -5,9 +5,11 @@
  * Accept button triggers mutation, expands notes panel on accepted item.
  */
 
-import { useRef, useState } from 'react';import { useVirtualizer } from '@tanstack/react-virtual';
-import { Clock, User, CheckCircle, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
-import { useDoctorQueue, useAcceptConsultation } from '../hooks/useDoctorQueue';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Clock, User, CheckCircle, ChevronDown, ChevronUp, Calendar, Play, Video } from 'lucide-react';
+import { useDoctorQueue, useAcceptConsultation, useStartConsultation } from '../hooks/useDoctorQueue';
 import { ConsultationNotes } from './ConsultationNotes';
 import { PatientHistory } from './PatientHistory';
 import { PrescriptionUpload } from './PrescriptionUpload';
@@ -18,11 +20,11 @@ import type { ConsultationSummary } from '../../../shared/types';
 // ── Status badge ───────────────────────────────────────────────────────────
 
 const statusStyles: Record<string, string> = {
-  PENDING:     'bg-yellow-100 text-yellow-800',
-  ACCEPTED:    'bg-blue-100 text-blue-800',
+  PENDING: 'bg-yellow-100 text-yellow-800',
+  ACCEPTED: 'bg-blue-100 text-blue-800',
   IN_PROGRESS: 'bg-purple-100 text-purple-800',
-  COMPLETED:   'bg-accent-100 text-accent-800',
-  CANCELLED:   'bg-gray-100 text-gray-500',
+  COMPLETED: 'bg-accent-100 text-accent-800',
+  CANCELLED: 'bg-gray-100 text-gray-500',
 };
 
 // ── Queue row ──────────────────────────────────────────────────────────────
@@ -32,11 +34,13 @@ function QueueRow({
   isExpanded,
   onToggle,
 }: {
-  item:       ConsultationSummary;
+  item: ConsultationSummary;
   isExpanded: boolean;
-  onToggle:   () => void;
+  onToggle: () => void;
 }) {
   const acceptMutation = useAcceptConsultation();
+  const startMutation = useStartConsultation();
+  const navigate = useNavigate();
   const [showHistory, setShowHistory] = useState(false);
 
   return (
@@ -70,6 +74,7 @@ function QueueRow({
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* PENDING → Accept */}
           {item.status === 'PENDING' && (
             <button
               onClick={() => acceptMutation.mutate(item.id)}
@@ -78,14 +83,45 @@ function QueueRow({
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-accent-600 hover:bg-accent-700 disabled:bg-accent-300 text-white focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors"
             >
               {acceptMutation.isPending
-                ? <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                ? <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 : <CheckCircle size={12} />
               }
               Accept
             </button>
           )}
 
-          {/* Expand notes panel */}
+          {/* ACCEPTED → Start (marks IN_PROGRESS + opens video) */}
+          {item.status === 'ACCEPTED' && (
+            <button
+              onClick={() => {
+                startMutation.mutate(item.id, {
+                  onSuccess: () => navigate(`/consultation/${item.id}`),
+                });
+              }}
+              disabled={startMutation.isPending}
+              aria-busy={startMutation.isPending}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors"
+            >
+              {startMutation.isPending
+                ? <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                : <Play size={12} />
+              }
+              Start
+            </button>
+          )}
+
+          {/* IN_PROGRESS → rejoin the video call */}
+          {item.status === 'IN_PROGRESS' && (
+            <button
+              onClick={() => navigate(`/consultation/${item.id}`)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+            >
+              <Video size={12} />
+              Join Call
+            </button>
+          )}
+
+          {/* Expand notes panel for ACCEPTED or IN_PROGRESS */}
           {(item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS') && (
             <button
               onClick={onToggle}
@@ -143,17 +179,19 @@ function QueueRow({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function ConsultationQueue() {
-  const parentRef  = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const { data, isLoading, isError, isFetching } = useDoctorQueue();
 
   const rows: ConsultationSummary[] = data?.data ?? [];
 
+  // FIXED — measures actual DOM height of each row
   const virtualizer = useVirtualizer({
-    count:            rows.length,
+    count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize:     () => 100,
-    overscan:         5,
+    estimateSize: () => 100,
+    overscan: 5,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   return (
@@ -162,11 +200,11 @@ export function ConsultationQueue() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Consultation Queue</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Refreshes every 30 seconds</p>
+          <p className="text-sm text-gray-500 mt-0.5">Pending · Accepted · In Progress — refreshes every 30s</p>
         </div>
         {isFetching && !isLoading && (
           <div className="flex items-center gap-1.5 text-xs text-gray-400">
-            <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
             Updating…
           </div>
         )}
@@ -212,11 +250,13 @@ export function ConsultationQueue() {
                 return (
                   <div
                     key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
                     style={{
-                      position:  'absolute',
-                      top:       0,
-                      left:      0,
-                      width:     '100%',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
                       transform: `translateY(${virtualItem.start}px)`,
                     }}
                   >
