@@ -27,10 +27,10 @@ interface NavItem {
 }
 
 const patientNav: NavItem[] = [
-  { to: '/patient/dashboard',    label: 'Dashboard',      icon: <LayoutDashboard size={18} /> },
-  { to: '/patient/consultations',label: 'Consultations',  icon: <Stethoscope size={18} /> },
-  { to: '/patient/records',      label: 'Health Records', icon: <FileText size={18} /> },
-  { to: '/patient/emergency',    label: 'Emergency',      icon: <AlertTriangle size={18} /> },
+  { to: '/patient/dashboard',     label: 'Dashboard',      icon: <LayoutDashboard size={18} /> },
+  { to: '/patient/consultations/new', label: 'New Consultation', icon: <Stethoscope size={18} /> },
+  { to: '/patient/records',       label: 'Health Records', icon: <FileText size={18} /> },
+  { to: '/patient/emergency',     label: 'Emergency',      icon: <AlertTriangle size={18} /> },
 ];
 
 const doctorNav: NavItem[] = [

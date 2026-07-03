@@ -8,8 +8,8 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Clock, User, CheckCircle, ChevronDown, ChevronUp, Calendar, Play, Video } from 'lucide-react';
-import { useDoctorQueue, useAcceptConsultation, useStartConsultation } from '../hooks/useDoctorQueue';
+import { Clock, User, CheckCircle, ChevronDown, ChevronUp, Calendar, Play, Video, FileText } from 'lucide-react';
+import { useDoctorQueue, useCompletedQueue, useAcceptConsultation, useStartConsultation } from '../hooks/useDoctorQueue';
 import { ConsultationNotes } from './ConsultationNotes';
 import { PatientHistory } from './PatientHistory';
 import { PrescriptionUpload } from './PrescriptionUpload';
@@ -122,7 +122,7 @@ function QueueRow({
           )}
 
           {/* Expand notes panel for ACCEPTED or IN_PROGRESS */}
-          {(item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS') && (
+          {(item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS' || item.status==='COMPLETED') && (
             <button
               onClick={onToggle}
               aria-expanded={isExpanded}
@@ -157,12 +157,14 @@ function QueueRow({
           )}
 
           {/* Notes editor */}
-          <ErrorBoundary>
-            <ConsultationNotes
+            {item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS' && (
+            <ErrorBoundary>
+              <ConsultationNotes 
               consultationId={item.id}
-              onCompleted={onToggle}
-            />
-          </ErrorBoundary>
+               onCompleted={onToggle}
+                />
+            </ErrorBoundary>
+          )}
 
           {/* Prescription upload — only after consultation is completed */}
           {item.status === 'COMPLETED' && (
@@ -179,11 +181,17 @@ function QueueRow({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function ConsultationQueue() {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const activeParentRef = useRef<HTMLDivElement>(null);
+  const completedParentRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const { data, isLoading, isError, isFetching } = useDoctorQueue();
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
 
-  const rows: ConsultationSummary[] = data?.data ?? [];
+  const { data: activeData, isLoading: activeLoading, isError: activeError, isFetching: activeFetching } = useDoctorQueue();
+  const { data: completedData, isLoading: completedLoading, isError: completedError, isFetching: completedFetching } = useCompletedQueue();
+
+  const activeRows: ConsultationSummary[] = activeData?.data ?? [];
+  const completedRows: ConsultationSummary[] = completedData?.data ?? [];
+  const rows = activeTab === 'active' ? activeRows : completedRows;
 
   // FIXED — measures actual DOM height of each row
   const virtualizer = useVirtualizer({
@@ -193,14 +201,22 @@ export function ConsultationQueue() {
     overscan: 5,
     measureElement: (el) => el.getBoundingClientRect().height,
   });
+  const isLoading = activeTab === 'active' ? activeLoading : completedLoading;
+  const isError = activeTab === 'active' ? activeError : completedError;
+  const isFetching = activeTab === 'active' ? activeFetching : completedFetching;
+  const parentRef = activeTab === 'active' ? activeParentRef : completedParentRef;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Consultation Queue</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Pending · Accepted · In Progress — refreshes every 30s</p>
+          <h1 className="text-2xl font-bold text-gray-900">Consultations</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {activeTab === 'active'
+              ? 'Pending · Accepted · In Progress — refreshes every 30s'
+              : 'Completed — upload prescriptions here'}
+          </p>
         </div>
         {isFetching && !isLoading && (
           <div className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -210,33 +226,70 @@ export function ConsultationQueue() {
         )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors focus:outline-none ${activeTab === 'active'
+              ? 'border-primary-600 text-primary-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          Active
+          {activeRows.length > 0 && (
+            <span className="ml-2 bg-primary-100 text-primary-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+              {activeRows.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('completed')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors focus:outline-none ${activeTab === 'completed'
+              ? 'border-primary-600 text-primary-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          Completed
+          {completedRows.length > 0 && (
+            <span className="ml-2 bg-gray-100 text-gray-600 text-xs font-bold px-1.5 py-0.5 rounded-full">
+              {completedData?.meta.total ?? completedRows.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Queue card */}
       <div className="card p-0 overflow-hidden">
-        {/* Loading */}
         {isLoading && (
           <div className="flex justify-center py-12">
-            <LoadingSpinner label="Loading queue…" />
+            <LoadingSpinner label="Loading…" />
           </div>
         )}
 
-        {/* Error */}
         {isError && (
           <div className="text-center py-12">
             <Clock size={32} className="text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Could not load queue. Will retry automatically.</p>
+            <p className="text-sm text-gray-500">Could not load. Will retry automatically.</p>
           </div>
         )}
 
-        {/* Empty */}
         {!isLoading && !isError && rows.length === 0 && (
           <div className="text-center py-12">
-            <CheckCircle size={32} className="text-accent-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">No pending consultations.</p>
-            <p className="text-xs text-gray-400 mt-1">New requests will appear here automatically.</p>
+            {activeTab === 'active' ? (
+              <>
+                <CheckCircle size={32} className="text-accent-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No active consultations.</p>
+                <p className="text-xs text-gray-400 mt-1">New requests will appear here automatically.</p>
+              </>
+            ) : (
+              <>
+                <FileText size={32} className="text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No completed consultations yet.</p>
+              </>
+            )}
           </div>
         )}
 
-        {/* Virtualised list */}
         {rows.length > 0 && (
           <div
             ref={parentRef}
@@ -250,9 +303,10 @@ export function ConsultationQueue() {
                 return (
                   <div
                     key={virtualItem.key}
-                    data-index={virtualItem.index}
+                    data-index={virtualItem.index}              // add this
                     ref={virtualizer.measureElement}
                     style={{
+
                       position: 'absolute',
                       top: 0,
                       left: 0,
@@ -277,8 +331,8 @@ export function ConsultationQueue() {
 
       {rows.length > 0 && (
         <p className="text-xs text-gray-400 text-center">
-          {rows.length} consultation{rows.length !== 1 ? 's' : ''} in queue
-          {data?.meta.hasNextPage && ' — scroll to load more'}
+          {rows.length} consultation{rows.length !== 1 ? 's' : ''}
+          {(activeTab === 'active' ? activeData : completedData)?.meta.hasNextPage && ' — scroll to load more'}
         </p>
       )}
     </div>

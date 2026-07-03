@@ -6,7 +6,13 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { getDoctorQueue, acceptConsultation, startConsultation, addConsultationNotes } from '../api/doctorApi';
+import {
+  getDoctorQueue,
+  getCompletedQueue,
+  acceptConsultation,
+  startConsultation,
+  addConsultationNotes,
+} from '../api/doctorApi';
 
 export const doctorKeys = {
   queue: (cursor?: string) => ['doctor', 'queue', cursor] as const,
@@ -20,6 +26,16 @@ export function useDoctorQueue(cursor?: string) {
     refetchInterval:      30_000,
     refetchIntervalInBackground: false, // pause polling when tab is hidden
     staleTime: 10_000,
+  });
+}
+
+/** Completed consultations — doctor's history tab, no polling needed */
+export function useCompletedQueue(cursor?: string) {
+  return useQuery({
+    queryKey: ['doctor', 'completed', cursor],
+    queryFn:  () => getCompletedQueue(cursor),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 

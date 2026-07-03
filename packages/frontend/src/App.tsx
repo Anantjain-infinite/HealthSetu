@@ -34,6 +34,11 @@ const AppointmentBooking = lazy(() =>
     default: m.AppointmentBooking,
   }))
 );
+const ConsultationDetail = lazy(() =>
+  import('./features/patient/components/ConsultationDetail').then((m) => ({
+    default: m.ConsultationDetail,
+  }))
+);
 const DoctorDashboard   = lazy(() =>
   import('./features/doctor/components/DoctorDashboard').then((m) => ({
     default: m.DoctorDashboard,
@@ -84,32 +89,68 @@ function UnauthorizedPage() {
     </div>
   );
 }
+/**
+ * Wraps public pages (login, register).
+ * If the user is already authenticated, redirects them to their dashboard.
+ * Prevents logged-in users from accessing /login or /register via URL.
+ */
+function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  const user       = useAuthStore((s) => s.user);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+
+  // Still checking session — show nothing yet to prevent flash
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" label="Loading..." />
+      </div>
+    );
+  }
+
+  // Already logged in — redirect to correct dashboard
+  if (user) {
+    if (user.role === 'PATIENT') {
+      return <Navigate to="/patient/dashboard" replace />;
+    }
+    if (user.role === 'DOCTOR') {
+      return <Navigate to="/doctor/dashboard" replace />;
+    }
+  }
+
+  // Not logged in — show the page normally
+  return <>{children}</>;
+}
 
 // ── App component ──────────────────────────────────────────────────────────
 
 export default function App() {
-  const hydrate = useAuthStore((s) => s.hydrate);
-
-  // Restore session on every page load / reload
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    useAuthStore.getState().hydrate();
+  }, []);
 
   return (
     <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* ── Public routes ──────────────────────────────────────── */}
-          <Route path="/login"        element={<LoginForm />} />
-          <Route path="/register"     element={<RegisterForm />} />
+          {/* ── Public routes — redirect to dashboard if already logged in ── */}
+          <Route
+            path="/login"
+            element={<PublicOnlyRoute><LoginForm /></PublicOnlyRoute>}
+          />
+          <Route
+            path="/register"
+            element={<PublicOnlyRoute><RegisterForm /></PublicOnlyRoute>}
+          />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* ── Patient routes ─────────────────────────────────────── */}
           <Route element={<ProtectedRoute allowedRoles={['PATIENT']} />}>
             <Route element={<Layout />}>
-              <Route path="/patient/dashboard"         element={<PatientDashboard />} />
-              <Route path="/patient/consultations/new" element={<AppointmentBooking />} />
-              <Route path="/patient/emergency"         element={<EmergencyLogPage />} />
+              <Route path="/patient/dashboard"                element={<PatientDashboard />} />
+              <Route path="/patient/consultations/new"       element={<AppointmentBooking />} />
+              <Route path="/patient/consultations/:id"       element={<ConsultationDetail />} />
+              <Route path="/patient/emergency"               element={<EmergencyLogPage />} />
               {/* Consultations and records added in Step 3 */}
             </Route>
           </Route>

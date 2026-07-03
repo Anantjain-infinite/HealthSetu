@@ -5,6 +5,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FileText, ChevronDown, Calendar, Stethoscope } from 'lucide-react';
 import { useConsultationHistory } from '../hooks/usePatientConsultations';
@@ -24,8 +25,15 @@ const statusStyles: Record<string, string> = {
 // ── Row component ──────────────────────────────────────────────────────────
 
 function ConsultationRow({ item }: { item: ConsultationSummary }) {
+  const navigate = useNavigate();
+
   return (
-    <div className="flex items-start gap-3 px-4 py-3 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors">
+    <button
+      type="button"
+      onClick={() => navigate(`/patient/consultations/${item.id}`)}
+      className="w-full flex items-start gap-3 px-4 py-3 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left focus:outline-none focus:bg-gray-50"
+      aria-label={`View consultation with Dr. ${item.doctor.fullName}`}
+    >
       <div className="w-9 h-9 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
         <Stethoscope size={16} className="text-primary-600" />
       </div>
@@ -48,7 +56,7 @@ function ConsultationRow({ item }: { item: ConsultationSummary }) {
           </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

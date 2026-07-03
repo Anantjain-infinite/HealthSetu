@@ -6,20 +6,18 @@
 import api from '../../../shared/lib/axiosInstance';
 import type { PaginatedResponse, ConsultationSummary } from '../../../shared/types';
 
+// ── Active queue (PENDING + ACCEPTED + IN_PROGRESS) ───────────────────────
+
 export async function getDoctorQueue(
   cursor?: string,
   limit = 20
 ): Promise<PaginatedResponse<ConsultationSummary>> {
-  // Fetch all active consultations — PENDING + ACCEPTED + IN_PROGRESS
-  // The backend accepts a single status param; we make three parallel requests
-  // and merge them so the doctor sees the full picture in one list.
   const [pending, accepted, inProgress] = await Promise.all([
     api.get('/consultations', { params: { status: 'PENDING',     cursor, limit } }),
     api.get('/consultations', { params: { status: 'ACCEPTED',    cursor, limit } }),
     api.get('/consultations', { params: { status: 'IN_PROGRESS', cursor, limit } }),
   ]);
 
-  // Merge and sort: IN_PROGRESS first, then ACCEPTED, then PENDING
   const statusOrder: Record<string, number> = {
     IN_PROGRESS: 0,
     ACCEPTED:    1,
@@ -34,15 +32,12 @@ export async function getDoctorQueue(
     (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99)
   );
 
-  const totalCount =
-    (inProgress.data.meta.total ?? 0) +
-    (accepted.data.meta.total ?? 0) +
-    (pending.data.meta.total ?? 0);
-
   return {
     data: allRows,
     meta: {
-      total:       totalCount,
+      total:       (inProgress.data.meta.total ?? 0) +
+                   (accepted.data.meta.total ?? 0) +
+                   (pending.data.meta.total ?? 0),
       limit,
       hasNextPage: pending.data.meta.hasNextPage ||
                    accepted.data.meta.hasNextPage ||
@@ -50,6 +45,29 @@ export async function getDoctorQueue(
     },
   };
 }
+
+// ── Completed consultations (for doctor's history tab) ────────────────────
+
+export async function getCompletedQueue(
+  cursor?: string,
+  limit = 20
+): Promise<PaginatedResponse<ConsultationSummary>> {
+  const { data } = await api.get('/consultations', {
+    params: { status: 'COMPLETED', cursor, limit },
+  });
+  return data;
+}
+
+// ── Consultation detail (for notes + prescriptions view) ─────────────────
+
+export async function getConsultationDetail(
+  consultationId: string
+) {
+  const { data } = await api.get(`/consultations/${consultationId}`);
+  return data;
+}
+
+// ── Status mutations ───────────────────────────────────────────────────────
 
 export async function acceptConsultation(
   consultationId: string
