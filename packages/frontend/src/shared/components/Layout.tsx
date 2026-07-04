@@ -5,7 +5,7 @@
  * Adapts navigation links based on user role (PATIENT vs DOCTOR).
  */
 
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   Stethoscope,
@@ -69,7 +69,9 @@ export function Layout() {
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <span className="text-lg font-bold text-primary-700">🏥 HealthSetu</span>
+          <Link to="/" className="text-lg font-bold text-primary-700">
+            🏥 HealthSetu
+          </Link>
         </div>
 
         {/* User info + logout */}

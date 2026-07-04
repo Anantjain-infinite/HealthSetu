@@ -21,6 +21,7 @@ import { Layout } from './shared/components/Layout';
 // ── Auth pages (small — not lazy loaded) ──────────────────────────────────
 import { LoginForm }    from './features/auth/components/LoginForm';
 import { RegisterForm } from './features/auth/components/RegisterForm';
+import { LandingPage } from './features/landing/LandingPage';
 
 // ── Lazy-loaded feature pages ──────────────────────────────────────────────
 // Each import() creates a separate JS chunk — critical for slow 2G connections
@@ -169,7 +170,7 @@ export default function App() {
           </Route>
 
           {/* ── Default redirects ──────────────────────────────────── */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
